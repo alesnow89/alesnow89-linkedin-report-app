@@ -265,4 +265,13 @@ if uploaded_files:
             if not v_d.empty:
                 charts.append(("Visitors: page views e visitatori unici", fig_to_buffer(make_chart(v_d, v_d.columns[0], v_d.columns[1:3], "Visitors"))))
 
-            pdf_buffer = build_pdf(dfs[0], dfs[1],
+            pdf_buffer = build_pdf(dfs[0], dfs[1], dfs[2], metrics, names, charts)
+            st.download_button(
+                label="Scarica PDF",
+                data=pdf_buffer,
+                file_name="linkedin_report.pdf",
+                mime="application/pdf"
+            )
+            st.success("PDF generato correttamente.")
+        except Exception as e:
+            st.error(f"Errore nella generazione del PDF: {e}")
