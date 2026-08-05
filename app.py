@@ -10,7 +10,7 @@ from reportlab.lib.enums import TA_CENTER
 
 st.set_page_config(page_title="LinkedIn Excel to PDF", layout="wide")
 st.title("LinkedIn Report Builder")
-st.write("Carica i 3 file Excel esportati da LinkedIn e genera un report PDF con grafici e insight.")
+st.write("Carica i 3 file Excel esportati da LinkedIn e genera un report PDF più leggibile.")
 
 uploaded_files = st.file_uploader(
     "Carica i 3 file Excel",
@@ -67,6 +67,13 @@ def find_col(df, keyword):
         if keyword.lower() in c.lower():
             return c
     return None
+
+
+def safe_cell(v):
+    s = "" if pd.isna(v) else str(v)
+    if len(s) > 40:
+        s = s[:37] + "..."
+    return Paragraph(s.replace("\n", "<br/>"), ParagraphStyle("cell", fontName="Helvetica", fontSize=6.5, leading=8))
 
 
 def extract_metrics(content_df, followers_df, visitors_df):
@@ -155,16 +162,16 @@ def fig_to_buffer(fig):
 
 def build_pdf(content_df, followers_df, visitors_df, metrics, names, charts):
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=28, leftMargin=28, topMargin=28, bottomMargin=28)
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle("CenterTitle", parent=styles["Title"], alignment=TA_CENTER, textColor=colors.HexColor("#1f4e79"))
-    small = styles["BodyText"]
+    small = ParagraphStyle("Small", parent=styles["BodyText"], fontSize=9, leading=11)
     story = []
 
     story.append(Paragraph("LinkedIn Report", title_style))
-    story.append(Spacer(1, 10))
-    story.append(Paragraph("Executive summary dei tre file esportati da LinkedIn.", styles["Normal"]))
-    story.append(Spacer(1, 14))
+    story.append(Spacer(1, 8))
+    story.append(Paragraph("Executive summary dei tre file esportati da LinkedIn.", small))
+    story.append(Spacer(1, 12))
 
     summary = [
         ["File", "Righe", "Colonne"],
@@ -172,7 +179,7 @@ def build_pdf(content_df, followers_df, visitors_df, metrics, names, charts):
         [names[1], str(metrics["followers_rows"]), str(len(followers_df.columns))],
         [names[2], str(metrics["visitors_rows"]), str(len(visitors_df.columns))],
     ]
-    t = Table(summary, hAlign="LEFT", colWidths=[240, 80, 80])
+    t = Table(summary, hAlign="LEFT", colWidths=[240, 70, 70])
     t.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1f4e79")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
@@ -181,8 +188,20 @@ def build_pdf(content_df, followers_df, visitors_df, metrics, names, charts):
         ("BACKGROUND", (0, 1), (-1, -1), colors.whitesmoke),
     ]))
     story.append(t)
-    story.append(Spacer(1, 16))
+    story.append(Spacer(1, 14))
 
+    story.append(Paragraph("Executive summary", styles["Heading1"]))
+    summary_text = [
+        f"Nel periodo analizzato, i contenuti hanno generato {fmt(metrics['content_impressions'])} impressioni, {fmt(metrics['content_clicks'])} clic, {fmt(metrics['content_reactions'])} reazioni e {fmt(metrics['content_comments'])} commenti.",
+        f"La crescita follower registrata è stata di {fmt(metrics['followers_total'])} unità complessive, con prevalenza di follower organici ({fmt(metrics['followers_organic'])}).",
+        f"La pagina ha totalizzato {fmt(metrics['page_views_total'])} visualizzazioni e {fmt(metrics['unique_visitors_total'])} visitatori unici.",
+        f"Il giorno con il maggiore volume di impressioni è stato {metrics['content_best_day']}."
+    ]
+    for s in summary_text:
+        story.append(Paragraph(s, small))
+        story.append(Spacer(1, 4))
+
+    story.append(Spacer(1, 6))
     story.append(Paragraph("Key insights", styles["Heading1"]))
     insights = [
         f"Impressioni totali contenuti: {fmt(metrics['content_impressions'])}.",
@@ -194,39 +213,48 @@ def build_pdf(content_df, followers_df, visitors_df, metrics, names, charts):
     ]
     for line in insights:
         story.append(Paragraph(f"• {line}", small))
-    story.append(Spacer(1, 12))
+    story.append(Spacer(1, 10))
 
     story.append(Paragraph("Charts", styles["Heading1"]))
     for chart in charts:
         story.append(Paragraph(chart[0], styles["Heading2"]))
-        story.append(Image(chart[1], width=480, height=180))
-        story.append(Spacer(1, 10))
+        story.append(Image(chart[1], width=500, height=185))
+        story.append(Spacer(1, 8))
 
     story.append(PageBreak())
-    story.append(Paragraph("Content performance", styles["Heading1"]))
-    story.append(Paragraph(f"Il file dei contenuti contiene {metrics['content_rows']} righe di dati giornalieri. La media della percentuale di interesse totale è {metrics['content_average_interest']:.3f}.", small))
-    story.append(Spacer(1, 8))
-
-    story.append(Paragraph("Followers", styles["Heading1"]))
-    story.append(Paragraph(f"Nel file followers si vedono {metrics['followers_rows']} giorni di tracking. I follower organici dominano il dato totale, con {fmt(metrics['followers_organic'])} follower organici complessivi.", small))
-    story.append(Spacer(1, 8))
-
-    story.append(Paragraph("Visitors", styles["Heading1"]))
-    story.append(Paragraph(f"Il file visitors mostra {metrics['visitors_rows']} righe di insight sulla pagina. Le visualizzazioni totali della pagina sono {fmt(metrics['page_views_total'])} e i visitatori unici totali sono {fmt(metrics['unique_visitors_total'])}.", small))
-    story.append(Spacer(1, 14))
+    story.append(Paragraph("Interpretation", styles["Heading1"]))
+    story.append(Paragraph(
+        f"I dati mostrano una base follower in crescita, con {fmt(metrics['followers_organic'])} follower organici complessivi. "
+        f"Il traffico sulla pagina è stato pari a {fmt(metrics['page_views_total'])} visualizzazioni e {fmt(metrics['unique_visitors_total'])} visitatori unici, "
+        f"segno di interesse sul profilo aziendale.",
+        small
+    ))
+    story.append(Spacer(1, 6))
+    story.append(Paragraph(
+        f"Il contenuto ha prodotto {fmt(metrics['content_impressions'])} impressioni e {fmt(metrics['content_clicks'])} clic. "
+        f"Il rapporto tra visibilità e interazione suggerisce che alcuni post hanno performato meglio di altri, con un picco il {metrics['content_best_day']}.",
+        small
+    ))
+    story.append(Spacer(1, 12))
 
     def preview_section(title, df):
         story.append(PageBreak())
         story.append(Paragraph(title, styles["Heading1"]))
-        preview = df.head(8).fillna("").astype(str)
-        table_data = [list(preview.columns)] + preview.values.tolist()
-        tt = Table(table_data, repeatRows=1)
+        preview = df.head(6).fillna("").astype(str)
+        display_cols = list(preview.columns[:6])
+        preview = preview[display_cols]
+        header = [Paragraph(str(c), ParagraphStyle("hdr", fontSize=6.5, leading=7, textColor=colors.black)) for c in preview.columns]
+        table_data = [header]
+        for _, row in preview.iterrows():
+            table_data.append([safe_cell(v) for v in row.tolist()])
+        tt = Table(table_data, repeatRows=1, colWidths=[72] * len(display_cols))
         tt.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#d9eaf7")),
             ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
             ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("FONTSIZE", (0, 0), (-1, -1), 7),
+            ("FONTSIZE", (0, 0), (-1, -1), 6),
+            ("LEADING", (0, 0), (-1, -1), 7),
         ]))
         story.append(tt)
 
